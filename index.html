@@ -1,0 +1,1151 @@
+<!DOCTYPE html>
+<html lang="en" class="h-full bg-slate-950 text-slate-100">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Ghana Police Service - Election Security Operations Center (E-SOC)</title>
+  
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  
+  <!-- FontAwesome Icons -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  
+  <!-- Leaflet CSS & JS -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  
+  <!-- Chart.js -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  
+  <!-- Google Fonts (Inter) -->
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            gps: {
+              navy: '#0b132b',
+              dark: '#070a14',
+              card: '#111827',
+              border: '#1f293d',
+              gold: '#e5a93c',
+              goldHover: '#c88f28',
+              red: '#ef4444',
+              green: '#10b981',
+              yellow: '#f59e0b',
+            }
+          },
+          fontFamily: {
+            sans: ['Inter', 'sans-serif'],
+          }
+        }
+      }
+    }
+  </script>
+
+  <style>
+    /* Custom Scrollbar for Tactical UI */
+    ::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+    ::-webkit-scrollbar-track {
+      background: #0b132b;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: #1e293b;
+      border-radius: 3px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: #e5a93c;
+    }
+
+    /* Pulsing Beacon Animations */
+    @keyframes pulse-red {
+      0% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.8); }
+      70% { box-shadow: 0 0 0 14px rgba(239, 68, 68, 0); }
+      100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); }
+    }
+    .pulsing-beacon-red {
+      border-radius: 50%;
+      animation: pulse-red 1.5s infinite;
+    }
+
+    @keyframes pulse-gold {
+      0% { box-shadow: 0 0 0 0 rgba(229, 169, 60, 0.8); }
+      70% { box-shadow: 0 0 0 12px rgba(229, 169, 60, 0); }
+      100% { box-shadow: 0 0 0 0 rgba(229, 169, 60, 0); }
+    }
+    .pulsing-beacon-gold {
+      border-radius: 50%;
+      animation: pulse-gold 2s infinite;
+    }
+
+    /* Leaflet Dark Map Tweaks */
+    .leaflet-container {
+      background: #080d1a !important;
+      font-family: 'Inter', sans-serif !important;
+    }
+    .leaflet-popup-content-wrapper {
+      background: #111827 !important;
+      color: #f8fafc !important;
+      border: 1px solid #1f293d;
+      border-radius: 8px !important;
+      box-shadow: 0 10px 25px -5px rgba(0,0,0,0.7) !important;
+    }
+    .leaflet-popup-tip {
+      background: #111827 !important;
+    }
+
+    .glass-panel {
+      background: rgba(17, 24, 39, 0.85);
+      backdrop-filter: blur(8px);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+    }
+  </style>
+</head>
+<body class="h-full flex flex-col font-sans overflow-hidden bg-slate-950 text-slate-100">
+
+  <!-- TOP HEADER / CONTROL BAR -->
+  <header class="bg-gps-navy border-b border-gps-border px-4 py-2.5 flex flex-wrap items-center justify-between gap-3 shrink-0 shadow-lg relative z-20">
+    <!-- Brand / Title -->
+    <div class="flex items-center gap-3">
+      <!-- Ghana Police Crest Simulation Container -->
+      <div class="w-10 h-10 rounded-full bg-slate-900 border-2 border-gps-gold flex items-center justify-center relative overflow-hidden shrink-0 shadow">
+        <div class="absolute inset-0 bg-gradient-to-b from-red-600 via-yellow-500 to-green-600 opacity-20"></div>
+        <i class="fa-solid font-bold fa-shield-halved text-gps-gold text-xl relative z-10"></i>
+      </div>
+      <div>
+        <div class="flex items-center gap-2">
+          <h1 class="text-lg font-bold tracking-wide text-white uppercase leading-none">
+            Ghana Police Service
+          </h1>
+          <span class="bg-red-950/80 border border-red-500/50 text-red-400 text-[10px] font-extrabold px-2 py-0.5 rounded-full flex items-center gap-1.5 animate-pulse">
+            <span class="w-2 h-2 rounded-full bg-red-500 inline-block"></span>
+            LIVE / E-SOC ACTIVE
+          </span>
+        </div>
+        <p class="text-xs text-slate-400 mt-0.5 flex items-center gap-2">
+          <span>NATIONAL ELECTION SECURITY OPERATIONS CENTER</span>
+          <span class="text-slate-600">•</span>
+          <span class="text-gps-gold font-mono" id="live-clock">00:00:00 GMT</span>
+        </p>
+      </div>
+    </div>
+
+    <!-- Filters Bar -->
+    <div class="flex flex-wrap items-center gap-2 text-xs">
+      <!-- Region Filter -->
+      <div class="flex items-center bg-slate-900/90 border border-slate-700 rounded-lg px-2 py-1">
+        <i class="fa-solid fa-map-location-dot text-gps-gold mr-1.5"></i>
+        <select id="region-filter" class="bg-transparent text-white font-medium focus:outline-none cursor-pointer pr-1">
+          <option value="ALL" class="bg-slate-900">All Regions (Ghana)</option>
+          <option value="GREATER ACCRA" class="bg-slate-900">Greater Accra</option>
+          <option value="ASHANTI" class="bg-slate-900">Ashanti</option>
+          <option value="NORTHERN" class="bg-slate-900">Northern</option>
+          <option value="WESTERN" class="bg-slate-900">Western</option>
+          <option value="CENTRAL" class="bg-slate-900">Central</option>
+          <option value="VOLTA" class="bg-slate-900">Volta</option>
+          <option value="EASTERN" class="bg-slate-900">Eastern</option>
+          <option value="BONO" class="bg-slate-900">Bono</option>
+        </select>
+      </div>
+
+      <!-- Risk Filter -->
+      <div class="flex items-center bg-slate-900/90 border border-slate-700 rounded-lg px-2 py-1">
+        <i class="fa-solid fa-triangle-exclamation text-amber-400 mr-1.5"></i>
+        <select id="risk-filter" class="bg-transparent text-white font-medium focus:outline-none cursor-pointer pr-1">
+          <option value="ALL" class="bg-slate-900">All Risk Levels</option>
+          <option value="HIGH" class="bg-slate-900">High Risk / Hotspots</option>
+          <option value="MEDIUM" class="bg-slate-900">Medium Risk</option>
+          <option value="LOW" class="bg-slate-900">Low Risk</option>
+        </select>
+      </div>
+
+      <!-- Audio Siren Toggle -->
+      <button id="siren-toggle-btn" onclick="toggleAudioAlerts()" class="bg-slate-900/90 hover:bg-slate-800 border border-slate-700 text-slate-300 hover:text-white px-2.5 py-1 rounded-lg flex items-center gap-1.5 transition">
+        <i class="fa-solid fa-volume-xmark text-slate-400" id="siren-icon"></i>
+        <span id="siren-text" class="hidden sm:inline">Mute Audio</span>
+      </button>
+    </div>
+
+    <!-- Quick Action Buttons -->
+    <div class="flex items-center gap-2">
+      <button onclick="openModal('report-modal')" class="bg-red-600 hover:bg-red-500 text-white font-semibold text-xs px-3 py-1.5 rounded-lg border border-red-400/30 flex items-center gap-1.5 shadow-md hover:shadow-red-900/30 transition">
+        <i class="fa-solid fa-triangle-exclamation"></i>
+        <span>Report Incident</span>
+      </button>
+      <button onclick="openModal('dispatch-modal')" class="bg-gps-gold hover:bg-gps-goldHover text-slate-950 font-bold text-xs px-3 py-1.5 rounded-lg flex items-center gap-1.5 shadow-md transition">
+        <i class="fa-solid fa-truck-fast"></i>
+        <span>Deploy RRU</span>
+      </button>
+      <button onclick="generateSITREP()" class="bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-600 text-xs px-2.5 py-1.5 rounded-lg flex items-center gap-1.5 transition">
+        <i class="fa-solid fa-file-contract text-gps-gold"></i>
+        <span class="hidden md:inline">SITREP</span>
+      </button>
+    </div>
+  </header>
+
+  <!-- KPI SUMMARY CARDS (HORIZONTAL BANNER) -->
+  <section class="bg-slate-900/90 border-b border-gps-border px-4 py-2 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 shrink-0 z-10">
+    <!-- KPI 1 -->
+    <div class="bg-gps-card/80 border border-gps-border p-2.5 rounded-lg flex items-center justify-between">
+      <div>
+        <div class="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Polling Stations</div>
+        <div class="text-lg lg:text-xl font-extrabold text-white mt-0.5 font-mono" id="kpi-stations">38,622</div>
+        <div class="text-[10px] text-emerald-400 flex items-center gap-1 mt-0.5">
+          <i class="fa-solid fa-circle-check"></i> 99.8% Operational
+        </div>
+      </div>
+      <div class="w-9 h-9 rounded-lg bg-blue-950/60 border border-blue-500/30 flex items-center justify-center text-blue-400">
+        <i class="fa-solid fa-check-to-slot text-lg"></i>
+      </div>
+    </div>
+
+    <!-- KPI 2 -->
+    <div class="bg-gps-card/80 border border-gps-border p-2.5 rounded-lg flex items-center justify-between">
+      <div>
+        <div class="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Personnel Deployed</div>
+        <div class="text-lg lg:text-xl font-extrabold text-white mt-0.5 font-mono" id="kpi-personnel">54,200</div>
+        <div class="text-[10px] text-slate-400 mt-0.5">GPS / Military / Aux.</div>
+      </div>
+      <div class="w-9 h-9 rounded-lg bg-emerald-950/60 border border-emerald-500/30 flex items-center justify-center text-emerald-400">
+        <i class="fa-solid fa-user-shield text-lg"></i>
+      </div>
+    </div>
+
+    <!-- KPI 3 -->
+    <div class="bg-gps-card/80 border border-gps-border p-2.5 rounded-lg flex items-center justify-between">
+      <div>
+        <div class="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">High-Risk Hotspots</div>
+        <div class="text-lg lg:text-xl font-extrabold text-amber-400 mt-0.5 font-mono" id="kpi-hotspots">1,245</div>
+        <div class="text-[10px] text-amber-400/80 mt-0.5 flex items-center gap-1">
+          <i class="fa-solid fa-shield-cat"></i> Level-3 Vigilance
+        </div>
+      </div>
+      <div class="w-9 h-9 rounded-lg bg-amber-950/60 border border-amber-500/30 flex items-center justify-center text-amber-400">
+        <i class="fa-solid fa-map-pin text-lg"></i>
+      </div>
+    </div>
+
+    <!-- KPI 4 -->
+    <div class="bg-gps-card/80 border border-gps-border p-2.5 rounded-lg flex items-center justify-between">
+      <div>
+        <div class="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Active Incidents</div>
+        <div class="text-lg lg:text-xl font-extrabold text-red-400 mt-0.5 font-mono" id="kpi-incidents">14</div>
+        <div class="text-[10px] text-red-400/90 mt-0.5 flex items-center gap-1 font-semibold">
+          <span class="w-1.5 h-1.5 rounded-full bg-red-500 animate-ping"></span> 3 Critical Alerts
+        </div>
+      </div>
+      <div class="w-9 h-9 rounded-lg bg-red-950/60 border border-red-500/30 flex items-center justify-center text-red-400">
+        <i class="fa-solid fa-bell text-lg"></i>
+      </div>
+    </div>
+
+    <!-- KPI 5 -->
+    <div class="bg-gps-card/80 border border-gps-border p-2.5 rounded-lg flex items-center justify-between col-span-2 sm:col-span-1">
+      <div>
+        <div class="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">RRU Fleet Ready</div>
+        <div class="text-lg lg:text-xl font-extrabold text-gps-gold mt-0.5 font-mono" id="kpi-rru">312 / 350</div>
+        <div class="text-[10px] text-slate-400 mt-0.5">89% Operational Readiness</div>
+      </div>
+      <div class="w-9 h-9 rounded-lg bg-amber-950/40 border border-gps-gold/30 flex items-center justify-center text-gps-gold">
+        <i class="fa-solid fa-car-side text-lg"></i>
+      </div>
+    </div>
+  </section>
+
+  <!-- MAIN DASHBOARD BODY (GRID LAYOUT) -->
+  <main class="flex-1 grid grid-cols-1 lg:grid-cols-12 gap-3 p-3 overflow-hidden min-h-0 bg-slate-950">
+    
+    <!-- LEFT PANEL: TACTICAL MAP VIEW (COL SPAN 7) -->
+    <section class="lg:col-span-7 bg-gps-card border border-gps-border rounded-xl flex flex-col overflow-hidden relative shadow-xl">
+      
+      <!-- Map Layer & Controls Header Overlay -->
+      <div class="absolute top-3 left-3 right-3 z-[1000] flex flex-wrap items-center justify-between gap-2 pointer-events-none">
+        <!-- Layer Toggles Box -->
+        <div class="glass-panel p-1.5 rounded-lg border border-slate-700/80 flex items-center gap-1 pointer-events-auto shadow-2xl text-xs">
+          <span class="text-[11px] text-slate-400 font-bold px-2 uppercase tracking-wider hidden sm:inline">Layers:</span>
+          
+          <button id="btn-toggle-hotspots" onclick="toggleMapLayer('hotspots')" class="px-2.5 py-1 rounded-md bg-amber-500/20 text-amber-300 border border-amber-500/40 font-medium hover:bg-amber-500/30 transition flex items-center gap-1.5">
+            <i class="fa-solid fa-fire text-amber-400"></i> Hotspots
+          </button>
+
+          <button id="btn-toggle-incidents" onclick="toggleMapLayer('incidents')" class="px-2.5 py-1 rounded-md bg-red-500/20 text-red-300 border border-red-500/40 font-medium hover:bg-red-500/30 transition flex items-center gap-1.5">
+            <i class="fa-solid fa-triangle-exclamation text-red-400"></i> Incidents
+          </button>
+
+          <button id="btn-toggle-rru" onclick="toggleMapLayer('rru')" class="px-2.5 py-1 rounded-md bg-blue-500/20 text-blue-300 border border-blue-500/40 font-medium hover:bg-blue-500/30 transition flex items-center gap-1.5">
+            <i class="fa-solid fa-shield-halved text-blue-400"></i> Patrols/RRU
+          </button>
+
+          <button id="btn-toggle-stations" onclick="toggleMapLayer('stations')" class="px-2.5 py-1 rounded-md bg-slate-800 text-slate-300 border border-slate-600 font-medium hover:bg-slate-700 transition flex items-center gap-1">
+            <i class="fa-solid fa-check-to-slot"></i> Polling
+          </button>
+        </div>
+
+        <!-- Legend Quick Toggle -->
+        <div class="glass-panel px-3 py-1.5 rounded-lg border border-slate-700/80 text-[11px] font-medium text-slate-200 pointer-events-auto shadow-2xl flex items-center gap-3">
+          <div class="flex items-center gap-1.5">
+            <span class="w-2.5 h-2.5 rounded-full bg-red-500 inline-block animate-ping"></span> Critical
+          </div>
+          <div class="flex items-center gap-1.5">
+            <span class="w-2.5 h-2.5 rounded-full bg-amber-500 inline-block"></span> High Risk
+          </div>
+          <div class="flex items-center gap-1.5">
+            <span class="w-2.5 h-2.5 rounded-full bg-emerald-500 inline-block"></span> Secure
+          </div>
+        </div>
+      </div>
+
+      <!-- Leaflet Map Container -->
+      <div id="map" class="w-full h-full min-h-[380px] z-0"></div>
+
+      <!-- Map Footer Bar -->
+      <div class="bg-slate-900 border-t border-gps-border px-3 py-1.5 flex items-center justify-between text-[11px] text-slate-400 z-10">
+        <div class="flex items-center gap-2">
+          <i class="fa-solid fa-satellite text-gps-gold"></i>
+          <span>GPS GeoSpatial Election Matrix v4.2</span>
+        </div>
+        <div class="flex items-center gap-3 font-mono">
+          <span>LAT/LONG: <span id="map-coords">7.9465° N, 1.0232° W</span></span>
+          <span class="text-emerald-400"><i class="fa-solid fa-wifi mr-1"></i> RTK LIVE</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- CENTER / RIGHT PANEL 1: REAL-TIME INCIDENT FEED & DISPATCH (COL SPAN 3) -->
+    <section class="lg:col-span-3 bg-gps-card border border-gps-border rounded-xl flex flex-col overflow-hidden shadow-xl">
+      <!-- Section Header -->
+      <div class="p-3 bg-slate-900/90 border-b border-gps-border flex items-center justify-between">
+        <div class="flex items-center gap-2">
+          <i class="fa-solid fa-list-check text-gps-gold"></i>
+          <h2 class="font-bold text-sm text-slate-100 uppercase tracking-wide">Live Incident Stream</h2>
+        </div>
+        <span class="bg-red-950 text-red-400 border border-red-500/40 text-[10px] font-bold px-2 py-0.5 rounded-full" id="incident-count-badge">
+          14 UNRESOLVED
+        </span>
+      </div>
+
+      <!-- Incident List Stream -->
+      <div class="flex-1 overflow-y-auto p-2 space-y-2" id="incident-feed-container">
+        <!-- Dynamic Incident Items loaded via JS -->
+      </div>
+
+      <!-- Feed Footer -->
+      <div class="p-2 bg-slate-900/80 border-t border-gps-border text-center">
+        <button onclick="filterIncidentFeed('CRITICAL')" class="text-xs text-gps-gold hover:underline font-semibold flex items-center justify-center gap-1 w-full">
+          <i class="fa-solid fa-filter"></i> Filter Critical Incidents Only
+        </button>
+      </div>
+    </section>
+
+    <!-- RIGHT PANEL 2: ANALYTICS & FORCE READINESS (COL SPAN 2) -->
+    <section class="lg:col-span-2 flex flex-col gap-3 overflow-y-auto">
+      
+      <!-- Chart Widget 1: Categories -->
+      <div class="bg-gps-card border border-gps-border rounded-xl p-3 flex flex-col shadow-xl">
+        <div class="flex items-center justify-between mb-2">
+          <h3 class="text-xs font-bold text-slate-300 uppercase tracking-wider flex items-center gap-1.5">
+            <i class="fa-solid fa-chart-pie text-gps-gold"></i> Incidents by Type
+          </h3>
+        </div>
+        <div class="h-36 relative">
+          <canvas id="categoryChart"></canvas>
+        </div>
+      </div>
+
+      <!-- Chart Widget 2: Security Deployment Ratio -->
+      <div class="bg-gps-card border border-gps-border rounded-xl p-3 flex flex-col shadow-xl">
+        <div class="flex items-center justify-between mb-2">
+          <h3 class="text-xs font-bold text-slate-300 uppercase tracking-wider flex items-center gap-1.5">
+            <i class="fa-solid fa-users-gear text-gps-gold"></i> Force Mix Ratio
+          </h3>
+        </div>
+        <div class="h-32 relative">
+          <canvas id="deploymentChart"></canvas>
+        </div>
+      </div>
+
+      <!-- Readiness Gauges Widget -->
+      <div class="bg-gps-card border border-gps-border rounded-xl p-3 flex flex-col gap-2.5 shadow-xl flex-1">
+        <h3 class="text-xs font-bold text-slate-300 uppercase tracking-wider flex items-center gap-1.5">
+          <i class="fa-solid fa-gauge-high text-gps-gold"></i> Force Logistics
+        </h3>
+
+        <!-- Gauge 1 -->
+        <div>
+          <div class="flex justify-between text-[11px] mb-1">
+            <span class="text-slate-400">Comms Network Grid</span>
+            <span class="text-emerald-400 font-bold font-mono">98.4%</span>
+          </div>
+          <div class="w-full bg-slate-800 h-1.5 rounded-full overflow-hidden">
+            <div class="bg-emerald-500 h-full rounded-full" style="width: 98.4%"></div>
+          </div>
+        </div>
+
+        <!-- Gauge 2 -->
+        <div>
+          <div class="flex justify-between text-[11px] mb-1">
+            <span class="text-slate-400">Fleet Fuel & Logistics</span>
+            <span class="text-gps-gold font-bold font-mono">82.0%</span>
+          </div>
+          <div class="w-full bg-slate-800 h-1.5 rounded-full overflow-hidden">
+            <div class="bg-gps-gold h-full rounded-full" style="width: 82%"></div>
+          </div>
+        </div>
+
+        <!-- Gauge 3 -->
+        <div>
+          <div class="flex justify-between text-[11px] mb-1">
+            <span class="text-slate-400">Bodycam/CCTV Feeds</span>
+            <span class="text-blue-400 font-bold font-mono">91.5%</span>
+          </div>
+          <div class="w-full bg-slate-800 h-1.5 rounded-full overflow-hidden">
+            <div class="bg-blue-500 h-full rounded-full" style="width: 91.5%"></div>
+          </div>
+        </div>
+
+        <!-- Regional Hotspot Leaderboard -->
+        <div class="mt-1 pt-2 border-t border-slate-800">
+          <div class="text-[11px] font-bold text-slate-400 uppercase mb-1.5">Top Hotspot Regions</div>
+          <div class="space-y-1 text-xs">
+            <div class="flex justify-between items-center bg-slate-900/60 px-2 py-1 rounded border border-slate-800">
+              <span class="text-slate-300">1. Ashanti</span>
+              <span class="text-amber-400 font-mono font-bold">342 Spots</span>
+            </div>
+            <div class="flex justify-between items-center bg-slate-900/60 px-2 py-1 rounded border border-slate-800">
+              <span class="text-slate-300">2. Greater Accra</span>
+              <span class="text-amber-400 font-mono font-bold">289 Spots</span>
+            </div>
+            <div class="flex justify-between items-center bg-slate-900/60 px-2 py-1 rounded border border-slate-800">
+              <span class="text-slate-300">3. Northern</span>
+              <span class="text-amber-400 font-mono font-bold">195 Spots</span>
+            </div>
+          </div>
+        </div>
+
+      </div>
+
+    </section>
+
+  </main>
+
+  <!-- MODAL 1: REPORT INCIDENT FORM -->
+  <div id="report-modal" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-[2000] hidden flex items-center justify-center p-4">
+    <div class="bg-gps-card border border-gps-border w-full max-w-lg rounded-xl shadow-2xl overflow-hidden flex flex-col">
+      <!-- Modal Header -->
+      <div class="bg-red-950/60 border-b border-red-500/30 px-4 py-3 flex items-center justify-between">
+        <div class="flex items-center gap-2 text-red-400 font-bold text-sm uppercase">
+          <i class="fa-solid fa-triangle-exclamation text-lg"></i>
+          <span>Report Critical Election Incident</span>
+        </div>
+        <button onclick="closeModal('report-modal')" class="text-slate-400 hover:text-white transition">
+          <i class="fa-solid fa-xmark text-lg"></i>
+        </button>
+      </div>
+
+      <!-- Modal Body Form -->
+      <form id="report-form" onsubmit="handleIncidentSubmit(event)" class="p-4 space-y-3.5 text-xs">
+        <div>
+          <label class="block text-slate-300 font-semibold mb-1">Polling Station / Location Code</label>
+          <input type="text" id="inc-location" required placeholder="e.g. C070201 - Kumasi Central Academy" class="w-full bg-slate-900 border border-slate-700 rounded-lg p-2 text-slate-100 focus:outline-none focus:border-gps-gold">
+        </div>
+
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="block text-slate-300 font-semibold mb-1">Region</label>
+            <select id="inc-region" required class="w-full bg-slate-900 border border-slate-700 rounded-lg p-2 text-slate-100 focus:outline-none focus:border-gps-gold">
+              <option value="Ashanti">Ashanti</option>
+              <option value="Greater Accra">Greater Accra</option>
+              <option value="Northern">Northern</option>
+              <option value="Western">Western</option>
+              <option value="Central">Central</option>
+              <option value="Volta">Volta</option>
+              <option value="Eastern">Eastern</option>
+            </select>
+          </div>
+          <div>
+            <label class="block text-slate-300 font-semibold mb-1">Severity Level</label>
+            <select id="inc-severity" required class="w-full bg-slate-900 border border-slate-700 rounded-lg p-2 text-slate-100 focus:outline-none focus:border-gps-gold">
+              <option value="CRITICAL">CRITICAL (Red Alert)</option>
+              <option value="HIGH">HIGH (Urgent)</option>
+              <option value="MEDIUM">MEDIUM (Moderate)</option>
+              <option value="LOW">LOW (Informational)</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="block text-slate-300 font-semibold mb-1">Incident Category</label>
+            <select id="inc-category" required class="w-full bg-slate-900 border border-slate-700 rounded-lg p-2 text-slate-100 focus:outline-none focus:border-gps-gold">
+              <option value="Ballot Snatching">Ballot Box Snatching</option>
+              <option value="Crowd Surge / Riot">Crowd Surge / Riot</option>
+              <option value="Intimidation">Voter Intimidation</option>
+              <option value="Equipment Failure">BVVT Machine Failure</option>
+              <option value="Vandalism">Property Vandalism</option>
+            </select>
+          </div>
+          <div>
+            <label class="block text-slate-300 font-semibold mb-1">Reporting Officer ID</label>
+            <input type="text" id="inc-officer" required placeholder="GPS-88421-ACC" class="w-full bg-slate-900 border border-slate-700 rounded-lg p-2 text-slate-100 focus:outline-none focus:border-gps-gold">
+          </div>
+        </div>
+
+        <div>
+          <label class="block text-slate-300 font-semibold mb-1">Incident Details / Situation Summary</label>
+          <textarea id="inc-details" rows="3" required placeholder="Describe brief situation on ground, crowd size, weapons involved, or support required..." class="w-full bg-slate-900 border border-slate-700 rounded-lg p-2 text-slate-100 focus:outline-none focus:border-gps-gold"></textarea>
+        </div>
+
+        <div class="pt-2 flex items-center justify-end gap-2">
+          <button type="button" onclick="closeModal('report-modal')" class="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 font-semibold rounded-lg">Cancel</button>
+          <button type="submit" class="px-4 py-2 bg-red-600 hover:bg-red-500 text-white font-bold rounded-lg shadow-lg flex items-center gap-1.5">
+            <i class="fa-solid fa-paper-plane"></i> Broadcast Alert
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- MODAL 2: DISPATCH RAPID RESPONSE UNIT (RRU) -->
+  <div id="dispatch-modal" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-[2000] hidden flex items-center justify-center p-4">
+    <div class="bg-gps-card border border-gps-border w-full max-w-md rounded-xl shadow-2xl overflow-hidden flex flex-col">
+      <!-- Modal Header -->
+      <div class="bg-amber-950/60 border-b border-amber-500/30 px-4 py-3 flex items-center justify-between">
+        <div class="flex items-center gap-2 text-gps-gold font-bold text-sm uppercase">
+          <i class="fa-solid fa-truck-fast text-lg"></i>
+          <span>Dispatch Tactical Rapid Response (RRU)</span>
+        </div>
+        <button onclick="closeModal('dispatch-modal')" class="text-slate-400 hover:text-white transition">
+          <i class="fa-solid fa-xmark text-lg"></i>
+        </button>
+      </div>
+
+      <!-- Modal Body -->
+      <form id="dispatch-form" onsubmit="handleDispatchSubmit(event)" class="p-4 space-y-3.5 text-xs">
+        <div>
+          <label class="block text-slate-300 font-semibold mb-1">Select Available Tactical Unit</label>
+          <select id="dispatch-unit" required class="w-full bg-slate-900 border border-slate-700 rounded-lg p-2 text-slate-100 focus:outline-none focus:border-gps-gold">
+            <option value="RRU-Alpha-1 (Accra Central)">RRU Alpha 1 - Armored Squad (Accra)</option>
+            <option value="RRU-Bravo-4 (Kumasi Sector)">RRU Bravo 4 - Airborne & Tactical (Kumasi)</option>
+            <option value="RRU-Delta-2 (Tamale Metro)">RRU Delta 2 - Rapid Patrol (Tamale)</option>
+            <option value="RRU-Echo-9 (Takoradi Command)">RRU Echo 9 - Marine & Land Unit (Takoradi)</option>
+            <option value="GAF-Joint-Taskforce-3">GAF Joint Airborne Support (National Reserve)</option>
+          </select>
+        </div>
+
+        <div>
+          <label class="block text-slate-300 font-semibold mb-1">Target Zone / Polling Station</label>
+          <input type="text" id="dispatch-target" required placeholder="e.g. Bantama Polling Station #04 or Active Incident #102" class="w-full bg-slate-900 border border-slate-700 rounded-lg p-2 text-slate-100 focus:outline-none focus:border-gps-gold">
+        </div>
+
+        <div>
+          <label class="block text-slate-300 font-semibold mb-1">Mission Protocol</label>
+          <select id="dispatch-protocol" class="w-full bg-slate-900 border border-slate-700 rounded-lg p-2 text-slate-100 focus:outline-none focus:border-gps-gold">
+            <option value="Crowd Control">Crowd Control & Perimeter Lockdown</option>
+            <option value="VIP Escort / Ballot Protection">Ballot Security & Escort</option>
+            <option value="Active Threat Neutralization">Active Threat Suppression</option>
+            <option value="Equipment Reinforcement">Logistical Support</option>
+          </select>
+        </div>
+
+        <div class="bg-slate-900 p-2.5 rounded-lg border border-slate-800 flex items-center justify-between text-slate-300">
+          <span>Estimated Response Time (ETA):</span>
+          <span class="font-bold text-emerald-400 font-mono">6 - 12 Mins</span>
+        </div>
+
+        <div class="pt-2 flex items-center justify-end gap-2">
+          <button type="button" onclick="closeModal('dispatch-modal')" class="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 font-semibold rounded-lg">Cancel</button>
+          <button type="submit" class="px-4 py-2 bg-gps-gold hover:bg-gps-goldHover text-slate-950 font-bold rounded-lg shadow-lg flex items-center gap-1.5">
+            <i class="fa-solid fa-paper-plane"></i> Order Deployment
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- MODAL 3: SITREP SUMMARY DISPLAY -->
+  <div id="sitrep-modal" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-[2000] hidden flex items-center justify-center p-4">
+    <div class="bg-gps-card border border-gps-border w-full max-w-2xl rounded-xl shadow-2xl overflow-hidden flex flex-col">
+      <div class="bg-slate-900 border-b border-gps-border px-4 py-3 flex items-center justify-between">
+        <div class="flex items-center gap-2 text-gps-gold font-bold text-sm uppercase">
+          <i class="fa-solid fa-file-invoice text-lg"></i>
+          <span>Official Ghana Police SITREP - Election Security</span>
+        </div>
+        <button onclick="closeModal('sitrep-modal')" class="text-slate-400 hover:text-white transition">
+          <i class="fa-solid fa-xmark text-lg"></i>
+        </button>
+      </div>
+      <div class="p-4 space-y-3 font-mono text-xs text-slate-300 overflow-y-auto max-h-[70vh] bg-slate-950/50" id="sitrep-content">
+        <!-- Generated SITREP text -->
+      </div>
+      <div class="p-3 bg-slate-900 border-t border-gps-border flex justify-end gap-2">
+        <button onclick="closeModal('sitrep-modal')" class="px-3 py-1.5 bg-slate-800 text-slate-300 rounded font-semibold text-xs">Close</button>
+        <button onclick="copySitrep()" class="px-3 py-1.5 bg-gps-gold text-slate-950 font-bold rounded text-xs flex items-center gap-1">
+          <i class="fa-solid fa-copy"></i> Copy to Clipboard
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- NOTIFICATION TOAST -->
+  <div id="toast" class="fixed bottom-5 right-5 bg-slate-900 border border-gps-gold text-slate-100 px-4 py-3 rounded-lg shadow-2xl z-[3000] transform transition-all duration-300 translate-y-20 opacity-0 flex items-center gap-3">
+    <i class="fa-solid fa-shield-halved text-gps-gold text-xl" id="toast-icon"></i>
+    <div>
+      <h4 class="font-bold text-xs uppercase text-gps-gold" id="toast-title">System Alert</h4>
+      <p class="text-xs text-slate-300" id="toast-msg">Action processed successfully.</p>
+    </div>
+  </div>
+
+  <!-- DASHBOARD JAVASCRIPT LOGIC -->
+  <script>
+    // --- GLOBAL DATA & STATE ---
+    let map;
+    let markersGroup = {
+      hotspots: L.layerGroup(),
+      incidents: L.layerGroup(),
+      rru: L.layerGroup(),
+      stations: L.layerGroup()
+    };
+    let audioAlertsEnabled = false;
+
+    // Sample Incident Dataset
+    let incidentsList = [
+      { id: 101, region: 'Ashanti', location: 'Kumasi Central - Station #014', category: 'Ballot Snatching', severity: 'CRITICAL', status: 'UNRESOLVED', time: '10:42 GMT', coords: [6.6885, -1.6244], details: 'Group of 5 individuals attempted to disrupt ballot box transportation. Local unit requests immediate backup.' },
+      { id: 102, region: 'Greater Accra', location: 'Odododiodio - Station #089', category: 'Crowd Surge / Riot', severity: 'HIGH', status: 'EN ROUTE', time: '10:38 GMT', coords: [5.5500, -0.2070], details: 'Agitated voters crowding gates following delay in BVVT machine restart. RRU Alpha dispatched.' },
+      { id: 103, region: 'Northern', location: 'Tamale Central - Station #002', category: 'Intimidation', severity: 'HIGH', status: 'UNRESOLVED', time: '10:15 GMT', coords: [9.4007, -0.8393], details: 'Unidentified motorbikers causing intimidation outside perimeter. Security personnel holding line.' },
+      { id: 104, region: 'Western', location: 'Sekondi Market Area', category: 'Equipment Failure', severity: 'MEDIUM', status: 'RESOLVED', time: '09:50 GMT', coords: [4.9340, -1.7137], details: 'Biometric verification kit battery drained. EC officials replacing kit under police escort.' },
+      { id: 105, region: 'Volta', location: 'Ho Central - Station #031', category: 'Vandalism', severity: 'LOW', status: 'UNRESOLVED', time: '09:30 GMT', coords: [6.6000, 0.4700], details: 'Minor alteration of poster boundaries. Situation calm and monitored.' },
+      { id: 106, region: 'Bono', location: 'Sunyani West - Station #011', category: 'Intimidation', severity: 'MEDIUM', status: 'UNRESOLVED', time: '09:12 GMT', coords: [7.3349, -2.3123], details: 'Party agents argument over queue ordering. Local police mediator resolving.' }
+    ];
+
+    // Sample High-Risk Hotspot Points across Ghana
+    const hotspotData = [
+      { name: 'Bantama Hotspot Cluster', region: 'Ashanti', coords: [6.7000, -1.6300], risk: 'HIGH' },
+      { name: 'Ayawaso East Perimeter', region: 'Greater Accra', coords: [5.5800, -0.1900], risk: 'HIGH' },
+      { name: 'Yendi High Alert Zone', region: 'Northern', coords: [9.4427, -0.0099], risk: 'HIGH' },
+      { name: 'Bawku Border Sector', region: 'Upper East', coords: [11.0616, -0.2417], risk: 'HIGH' },
+      { name: 'Asawase Tactical Zone', region: 'Ashanti', coords: [6.7050, -1.6010], risk: 'HIGH' },
+      { name: 'Techiman South Hotspot', region: 'Bono East', coords: [7.5833, -1.9333], risk: 'MEDIUM' }
+    ];
+
+    // Sample Mobile RRU Units (GPS Tracked)
+    const rruUnits = [
+      { code: 'RRU-Alpha-1', region: 'Greater Accra', status: 'PATROLLING', coords: [5.5600, -0.2000] },
+      { code: 'RRU-Bravo-4', region: 'Ashanti', status: 'DISPATCHED', coords: [6.6900, -1.6200] },
+      { code: 'RRU-Delta-2', region: 'Northern', status: 'PATROLLING', coords: [9.4100, -0.8400] },
+      { code: 'RRU-Echo-9', region: 'Western', status: 'STANDBY', coords: [4.9400, -1.7200] }
+    ];
+
+    // Sample Polling Station Markers
+    const pollingStations = [
+      { code: 'PS-ACC-001', name: 'Legon Hall - UG Campus', coords: [5.6500, -0.1870], status: 'SECURE' },
+      { code: 'PS-KMS-042', name: 'KNUST Great Hall', coords: [6.6740, -1.5710], status: 'SECURE' },
+      { code: 'PS-TML-019', name: 'Tamale SHS Grounds', coords: [9.4200, -0.8500], status: 'SECURE' },
+      { code: 'PS-HO-008', name: 'Mawuli School Center', coords: [6.6100, 0.4800], status: 'SECURE' }
+    ];
+
+    // --- INITIALIZATION ON DOM LOAD ---
+    window.onload = function() {
+      initClock();
+      initMap();
+      renderIncidentFeed();
+      initCharts();
+      setupFilterListeners();
+    };
+
+    // --- LIVE CLOCK ---
+    function initClock() {
+      function updateClock() {
+        const now = new Date();
+        const timeStr = now.toUTCString().split(' ')[4] + ' GMT';
+        document.getElementById('live-clock').innerText = timeStr;
+      }
+      updateClock();
+      setInterval(updateClock, 1000);
+    }
+
+    // --- MAP INITIALIZATION (LEAFLET.JS) ---
+    function initMap() {
+      // Centered on Ghana
+      map = L.map('map', {
+        center: [7.9465, -1.0232],
+        zoom: 7,
+        zoomControl: false
+      });
+
+      // Dark Matter Map Tiles
+      L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+        attribution: '&copy; Ghana Police Service | CARTO',
+        maxZoom: 18,
+        subdomains: 'abcd'
+      }).addTo(map);
+
+      // Re-position Zoom control
+      L.control.zoom({ position: 'bottomright' }).addTo(map);
+
+      // Mouse Coordinates Tracking
+      map.on('mousemove', function(e) {
+        document.getElementById('map-coords').innerText = `${e.latlng.lat.toFixed(4)}° N, ${e.latlng.lng.toFixed(4)}° W`;
+      });
+
+      // Add Layer Groups to Map
+      Object.values(markersGroup).forEach(group => group.addTo(map));
+
+      // Populate Layers
+      renderMapHotspots();
+      renderMapIncidents();
+      renderMapRRU();
+      renderMapStations();
+    }
+
+    // --- MAP LAYER RENDERERS ---
+
+    // 1. Render Hotspots
+    function renderMapHotspots() {
+      markersGroup.hotspots.clearLayers();
+      hotspotData.forEach(spot => {
+        const circle = L.circleMarker(spot.coords, {
+          radius: spot.risk === 'HIGH' ? 16 : 10,
+          fillColor: spot.risk === 'HIGH' ? '#f59e0b' : '#3b82f6',
+          color: '#ffffff',
+          weight: 1,
+          opacity: 0.8,
+          fillOpacity: 0.35
+        });
+
+        circle.bindPopup(`
+          <div class="p-1">
+            <span class="bg-amber-950 text-amber-400 border border-amber-500/40 text-[10px] font-bold px-2 py-0.5 rounded">HIGH-RISK HOTSPOT</span>
+            <h4 class="font-bold text-sm text-slate-100 mt-1.5">${spot.name}</h4>
+            <p class="text-xs text-slate-400">Region: ${spot.region}</p>
+            <div class="mt-2 text-[11px] text-slate-300">
+              <i class="fa-solid fa-shield-virus text-gps-gold"></i> Heightened Vigilance Unit Assigned
+            </div>
+          </div>
+        `);
+        markersGroup.hotspots.addLayer(circle);
+      });
+    }
+
+    // 2. Render Active Incidents
+    function renderMapIncidents() {
+      markersGroup.incidents.clearLayers();
+      incidentsList.forEach(inc => {
+        if (!inc.coords) return;
+
+        const isCritical = inc.severity === 'CRITICAL';
+        const iconHtml = `
+          <div class="relative flex items-center justify-center">
+            <div class="w-7 h-7 ${isCritical ? 'pulsing-beacon-red bg-red-600' : 'bg-amber-500'} rounded-full flex items-center justify-center text-white border-2 border-slate-900 shadow-xl">
+              <i class="fa-solid ${isCritical ? 'fa-triangle-exclamation text-xs' : 'fa-bell text-xs'}"></i>
+            </div>
+          </div>
+        `;
+
+        const customIcon = L.divIcon({
+          html: iconHtml,
+          className: 'custom-incident-marker',
+          iconSize: [28, 28],
+          iconAnchor: [14, 14]
+        });
+
+        const marker = L.marker(inc.coords, { icon: customIcon });
+
+        marker.bindPopup(`
+          <div class="p-1.5 space-y-1.5">
+            <div class="flex items-center justify-between">
+              <span class="bg-red-950 text-red-400 border border-red-500/40 text-[10px] font-bold px-2 py-0.5 rounded">${inc.severity} INCIDENT</span>
+              <span class="text-[10px] font-mono text-slate-400">${inc.time}</span>
+            </div>
+            <h4 class="font-bold text-sm text-slate-100">${inc.category}</h4>
+            <p class="text-xs text-slate-300">${inc.location} (${inc.region})</p>
+            <p class="text-[11px] text-slate-400 italic bg-slate-900 p-1.5 rounded border border-slate-800">${inc.details}</p>
+            <div class="pt-1 flex gap-1.5">
+              <button onclick="dispatchToIncident('${inc.location}')" class="w-full bg-gps-gold hover:bg-gps-goldHover text-slate-950 font-bold text-[11px] py-1 rounded">
+                Dispatch Unit
+              </button>
+            </div>
+          </div>
+        `);
+
+        markersGroup.incidents.addLayer(marker);
+      });
+    }
+
+    // 3. Render Patrols / RRU Vehicles
+    function renderMapRRU() {
+      markersGroup.rru.clearLayers();
+      rruUnits.forEach(u => {
+        const iconHtml = `
+          <div class="w-6 h-6 bg-blue-600 border border-blue-300 rounded-md flex items-center justify-center text-white shadow-lg">
+            <i class="fa-solid fa-car-side text-[10px]"></i>
+          </div>
+        `;
+        const customIcon = L.divIcon({
+          html: iconHtml,
+          className: 'custom-rru-marker',
+          iconSize: [24, 24],
+          iconAnchor: [12, 12]
+        });
+
+        const marker = L.marker(u.coords, { icon: customIcon });
+        marker.bindPopup(`
+          <div class="p-1">
+            <span class="bg-blue-950 text-blue-400 border border-blue-500/40 text-[10px] font-bold px-2 py-0.5 rounded">GPS RAPID RESPONSE VEHICLE</span>
+            <h4 class="font-bold text-sm text-slate-100 mt-1">${u.code}</h4>
+            <p class="text-xs text-slate-400">Sector: ${u.region}</p>
+            <p class="text-xs text-emerald-400 font-semibold mt-1"><i class="fa-solid fa-satellite-dish"></i> Status: ${u.status}</p>
+          </div>
+        `);
+        markersGroup.rru.addLayer(marker);
+      });
+    }
+
+    // 4. Render Polling Stations
+    function renderMapStations() {
+      markersGroup.stations.clearLayers();
+      pollingStations.forEach(ps => {
+        const circle = L.circleMarker(ps.coords, {
+          radius: 5,
+          fillColor: '#10b981',
+          color: '#ffffff',
+          weight: 1,
+          opacity: 0.9,
+          fillOpacity: 0.8
+        });
+
+        circle.bindPopup(`
+          <div class="p-1">
+            <span class="bg-emerald-950 text-emerald-400 border border-emerald-500/40 text-[10px] font-bold px-2 py-0.5 rounded">POLLING STATION SECURE</span>
+            <h4 class="font-bold text-xs text-slate-100 mt-1">${ps.name}</h4>
+            <p class="text-[11px] text-slate-400">Code: ${ps.code}</p>
+            <p class="text-[10px] text-slate-400 mt-1">Presiding Officer Contacted: Yes</p>
+          </div>
+        `);
+        markersGroup.stations.addLayer(circle);
+      });
+    }
+
+    // Toggle Map Layers
+    function toggleMapLayer(layerName) {
+      const group = markersGroup[layerName];
+      const btn = document.getElementById(`btn-toggle-${layerName}`);
+      if (map.hasLayer(group)) {
+        map.removeLayer(group);
+        btn.classList.add('opacity-40');
+      } else {
+        map.addLayer(group);
+        btn.classList.remove('opacity-40');
+      }
+    }
+
+    // --- INCIDENT STREAM FEED SIDEBAR ---
+    function renderIncidentFeed(filterSeverity = 'ALL') {
+      const container = document.getElementById('incident-feed-container');
+      container.innerHTML = '';
+
+      const filtered = incidentsList.filter(i => filterSeverity === 'ALL' || i.severity === filterSeverity);
+
+      document.getElementById('incident-count-badge').innerText = `${filtered.length} UNRESOLVED`;
+
+      filtered.forEach(inc => {
+        const isCrit = inc.severity === 'CRITICAL';
+        const isHigh = inc.severity === 'HIGH';
+
+        const severityBadgeClass = isCrit 
+          ? 'bg-red-950/90 text-red-400 border-red-500/50' 
+          : isHigh ? 'bg-amber-950/90 text-amber-400 border-amber-500/50' : 'bg-blue-950/90 text-blue-400 border-blue-500/50';
+
+        const cardHtml = `
+          <div class="bg-slate-900/80 hover:bg-slate-800/80 border border-slate-800 hover:border-slate-700 p-2.5 rounded-lg transition shadow flex flex-col gap-1.5 cursor-pointer" onclick="zoomToIncident(${inc.coords[0]}, ${inc.coords[1]})">
+            <div class="flex items-center justify-between">
+              <span class="${severityBadgeClass} border text-[9px] font-extrabold px-2 py-0.5 rounded-full flex items-center gap-1">
+                ${isCrit ? '<span class="w-1.5 h-1.5 rounded-full bg-red-500 animate-ping"></span>' : ''}
+                ${inc.severity}
+              </span>
+              <span class="text-[10px] font-mono text-slate-400">${inc.time}</span>
+            </div>
+
+            <div>
+              <h4 class="font-bold text-xs text-slate-100 flex items-center gap-1.5">
+                <i class="fa-solid fa-triangle-exclamation text-gps-gold"></i>
+                ${inc.category}
+              </h4>
+              <p class="text-[11px] text-slate-300 font-medium">${inc.location}</p>
+            </div>
+
+            <p class="text-[10px] text-slate-400 line-clamp-2">${inc.details}</p>
+
+            <div class="flex items-center justify-between pt-1 border-t border-slate-800/80 mt-0.5 text-[10px]">
+              <span class="text-slate-400"><i class="fa-solid fa-location-dot text-red-400 mr-1"></i>${inc.region} Region</span>
+              <button onclick="event.stopPropagation(); dispatchToIncident('${inc.location}')" class="bg-gps-gold/20 hover:bg-gps-gold text-gps-gold hover:text-slate-950 font-bold px-2 py-0.5 rounded border border-gps-gold/40 transition">
+                Dispatch RRU
+              </button>
+            </div>
+          </div>
+        `;
+        container.innerHTML += cardHtml;
+      });
+    }
+
+    function zoomToIncident(lat, lng) {
+      if (map && lat && lng) {
+        map.flyTo([lat, lng], 13, { duration: 1.5 });
+      }
+    }
+
+    function filterIncidentFeed(sev) {
+      renderIncidentFeed(sev);
+      showToast('Feed Filtered', `Displaying ${sev} priority incidents.`);
+    }
+
+    // --- CHART.JS ANALYTICS ---
+    function initCharts() {
+      // 1. Categories Doughnut Chart
+      const ctxCat = document.getElementById('categoryChart').getContext('2d');
+      new Chart(ctxCat, {
+        type: 'doughnut',
+        data: {
+          labels: ['Ballot Snatching', 'Crowd Surge', 'Intimidation', 'BVVT Failure', 'Vandalism'],
+          datasets: [{
+            data: [4, 5, 3, 2, 1],
+            backgroundColor: ['#ef4444', '#f59e0b', '#e5a93c', '#3b82f6', '#64748b'],
+            borderWidth: 1,
+            borderColor: '#111827'
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: {
+              position: 'right',
+              labels: { color: '#94a3b8', font: { size: 9, family: 'Inter' }, boxWidth: 10 }
+            }
+          }
+        }
+      });
+
+      // 2. Deployment Stacked Bar
+      const ctxDep = document.getElementById('deploymentChart').getContext('2d');
+      new Chart(ctxDep, {
+        type: 'bar',
+        data: {
+          labels: ['Accra', 'Ashanti', 'Northern', 'Western'],
+          datasets: [
+            { label: 'GPS Police', data: [12000, 14000, 6000, 5000], backgroundColor: '#e5a93c' },
+            { label: 'Armed Forces', data: [3000, 4000, 3000, 1500], backgroundColor: '#10b981' },
+            { label: 'Auxiliary', data: [2000, 2500, 1000, 1000], backgroundColor: '#3b82f6' }
+          ]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          scales: {
+            x: { stacked: true, ticks: { color: '#94a3b8', font: { size: 9 } }, grid: { display: false } },
+            y: { stacked: true, ticks: { color: '#94a3b8', font: { size: 8 } }, grid: { color: '#1e293b' } }
+          },
+          plugins: {
+            legend: { display: false }
+          }
+        }
+      });
+    }
+
+    // --- FILTER LISTENERS ---
+    function setupFilterListeners() {
+      document.getElementById('region-filter').addEventListener('change', function(e) {
+        const val = e.target.value;
+        showToast('Region Filter Updated', `Filtering map and data for ${val}`);
+        if (val === 'ASHANTI') map.flyTo([6.6885, -1.6244], 9);
+        else if (val === 'GREATER ACCRA') map.flyTo([5.5500, -0.2070], 10);
+        else if (val === 'NORTHERN') map.flyTo([9.4007, -0.8393], 9);
+        else map.flyTo([7.9465, -1.0232], 7);
+      });
+
+      document.getElementById('risk-filter').addEventListener('change', function(e) {
+        showToast('Risk Level Filtered', `Applied filter: ${e.target.value}`);
+      });
+    }
+
+    // --- MODAL HANDLERS ---
+    function openModal(id) {
+      document.getElementById(id).classList.remove('hidden');
+    }
+
+    function closeModal(id) {
+      document.getElementById(id).classList.add('hidden');
+    }
+
+    function handleIncidentSubmit(e) {
+      e.preventDefault();
+      const loc = document.getElementById('inc-location').value;
+      const reg = document.getElementById('inc-region').value;
+      const sev = document.getElementById('inc-severity').value;
+      const cat = document.getElementById('inc-category').value;
+      const det = document.getElementById('inc-details').value;
+
+      // Accra/Ashanti default coords fallback for user generated items
+      const coords = reg === 'Ashanti' ? [6.6900 + (Math.random()-0.5)*0.1, -1.6200 + (Math.random()-0.5)*0.1] : [5.5600 + (Math.random()-0.5)*0.1, -0.2000 + (Math.random()-0.5)*0.1];
+
+      const newInc = {
+        id: Date.now(),
+        region: reg,
+        location: loc,
+        category: cat,
+        severity: sev,
+        status: 'UNRESOLVED',
+        time: new Date().toUTCString().split(' ')[4].substring(0, 5) + ' GMT',
+        coords: coords,
+        details: det
+      };
+
+      incidentsList.unshift(newInc);
+      renderIncidentFeed();
+      renderMapIncidents();
+
+      // Update KPI
+      const kpi = document.getElementById('kpi-incidents');
+      kpi.innerText = parseInt(kpi.innerText) + 1;
+
+      closeModal('report-modal');
+      showToast('Incident Broadcasted', `New ${sev} incident logged at ${loc}`);
+
+      if (audioAlertsEnabled) playSirenSound();
+
+      // Fly map to new incident
+      map.flyTo(coords, 12);
+    }
+
+    function dispatchToIncident(locationName) {
+      document.getElementById('dispatch-target').value = locationName;
+      openModal('dispatch-modal');
+    }
+
+    function handleDispatchSubmit(e) {
+      e.preventDefault();
+      const unit = document.getElementById('dispatch-unit').value;
+      const target = document.getElementById('dispatch-target').value;
+
+      closeModal('dispatch-modal');
+      showToast('Deployment Dispatched', `${unit} ordered to deploy immediately to ${target}`);
+    }
+
+    // --- AUDIO SIREN SIMULATOR (TONE.JS / WEB AUDIO API) ---
+    function toggleAudioAlerts() {
+      audioAlertsEnabled = !audioAlertsEnabled;
+      const icon = document.getElementById('siren-icon');
+      const text = document.getElementById('siren-text');
+
+      if (audioAlertsEnabled) {
+        icon.className = 'fa-solid fa-volume-high text-gps-gold animate-bounce';
+        text.innerText = 'Audio Active';
+        showToast('Audio Alerts Enabled', 'Siren sounds enabled for critical incoming reports.');
+        playSirenSound();
+      } else {
+        icon.className = 'fa-solid fa-volume-xmark text-slate-400';
+        text.innerText = 'Mute Audio';
+        showToast('Audio Muted', 'Siren sounds disabled.');
+      }
+    }
+
+    function playSirenSound() {
+      try {
+        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+
+        osc.type = 'sawtooth';
+        osc.frequency.setValueAtTime(600, audioCtx.currentTime);
+        osc.frequency.exponentialRampToValueAtTime(900, audioCtx.currentTime + 0.3);
+
+        gain.gain.setValueAtTime(0.1, audioCtx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.5);
+
+        osc.connect(gain);
+        gain.connect(audioCtx.destination);
+
+        osc.start();
+        osc.stop(audioCtx.currentTime + 0.5);
+      } catch (e) {
+        console.log('Audio Context restricted or not supported');
+      }
+    }
+
+    // --- SITREP GENERATOR ---
+    function generateSITREP() {
+      const now = new Date().toUTCString();
+      const sitrepText = `
+===================================================================
+GHANA POLICE SERVICE - ELECTION SECURITY OPERATIONS CENTER (E-SOC)
+SITUATION REPORT (SITREP) - CLASSIFIED / OFFICIAL USE ONLY
+===================================================================
+TIMESTAMP          : ${now}
+OPERATIONAL STATUS : LIVE / ELECTION DAY MATRIX ACTIVE
+NATIONAL COMMAND   : GPS HEADQUARTERS, ACCRA
+
+1. HIGH-LEVEL KPI SUMMARY:
+-------------------------------------------------------------------
+- TOTAL POLLING STATIONS MONITORED  : 38,622 (99.8% ONLINE)
+- TOTAL PERSONNEL DEPLOYED          : 54,200 OFFICERS (GPS/GAF/AUX)
+- IDENTIFIED HOTSPOT ZONES          : 1,245 CLUSTERS
+- UNRESOLVED CRITICAL INCIDENTS     : ${incidentsList.filter(i=>i.severity==='CRITICAL').length} ACTIVE
+- RAPID RESPONSE FLEET READINESS    : 89% OPERATIONAL
+
+2. REGIONAL INCIDENT SUMMARY:
+-------------------------------------------------------------------
+- ASHANTI REGION    : 1 Critical (Ballot Box Snatching Attempt - Kumasi Central)
+- GREATER ACCRA     : 1 High Priority (Crowd Surge - Odododiodio)
+- NORTHERN REGION   : 1 High Priority (Perimeter Intimidation - Tamale)
+- WESTERN / VOLTA   : Minor logistical replacements underway.
+
+3. LOGISTICS & COMMUNICATIONS:
+-------------------------------------------------------------------
+- VHF/UHF ENCRYPTED RADIO GRID      : 98.4% COVERAGE
+- CCTV & DRONE VIDEO FEEDS          : ONLINE & PATROLLING
+- LOGISTICS FUEL RESERVES           : 82% CAPACITY
+
+4. COMMAND DIRECTIVE:
+-------------------------------------------------------------------
+ALL SECTOR COMMANDERS TO MAINTAIN HIGHEST VIGILANCE. RAPID RESPONSE
+UNITS (RRU) REMAIN ON STANDBY FOR IMMEDIATE DISPATCH UPON E-SOC ORDER.
+===================================================================
+      `;
+
+      document.getElementById('sitrep-content').innerText = sitrepText;
+      openModal('sitrep-modal');
+    }
+
+    function copySitrep() {
+      const text = document.getElementById('sitrep-content').innerText;
+      const el = document.createElement('textarea');
+      el.value = text;
+      document.body.appendChild(el);
+      el.select();
+      document.execCommand('copy');
+      document.body.removeChild(el);
+      showToast('SITREP Copied', 'Official report copied to clipboard.');
+    }
+
+    // --- TOAST NOTIFICATION UTILITY ---
+    function showToast(title, msg) {
+      const toast = document.getElementById('toast');
+      document.getElementById('toast-title').innerText = title;
+      document.getElementById('toast-msg').innerText = msg;
+
+      toast.classList.remove('translate-y-20', 'opacity-0');
+      toast.classList.add('translate-y-0', 'opacity-100');
+
+      setTimeout(() => {
+        toast.classList.remove('translate-y-0', 'opacity-100');
+        toast.classList.add('translate-y-20', 'opacity-0');
+      }, 3500);
+    }
+  </script>
+</body>
+</html>
